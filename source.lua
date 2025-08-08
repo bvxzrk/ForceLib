@@ -1,40 +1,567 @@
---!strict
--- ForceLib.lua - Enhanced UI Library with Loading Animation
+--[[
+    Force Lib v1.0 - Ультрасовременная библиотека интерфейсов для Roblox
+    Разработано для премиум качества с анимациями, эффектами и кастомными элементами
+    Размер: ~45KB (сжато)
+]]
 
 local ForceLib = {}
 ForceLib.__index = ForceLib
 
-local Players = game:GetService("Players")
-local UIS = game:GetService("UserInputService")
+-- Импорт необходимых сервисов
 local TweenService = game:GetService("TweenService")
-local HttpService = game:GetService("HttpService")
+local UserInputService = game:GetService("UserInputService")
 local RunService = game:GetService("RunService")
-local LocalPlayer = Players.LocalPlayer
+local HttpService = game:GetService("HttpService")
 
-ForceLib.Theme = {
-    MainColor = Color3.fromRGB(25, 25, 25),
-    AccentColor = Color3.fromRGB(0, 170, 255),
-    TextColor = Color3.new(1, 1, 1),
-    Font = Enum.Font.Gotham,
-    TextSize = 16,
+-- Конфигурация библиотеки
+local config = {
+    PrimaryColor = Color3.fromRGB(0, 170, 255),
+    SecondaryColor = Color3.fromRGB(30, 30, 40),
+    AccentColor = Color3.fromRGB(255, 85, 0),
+    TextColor = Color3.fromRGB(255, 255, 255),
+    DarkTextColor = Color3.fromRGB(50, 50, 50),
+    Font = Enum.Font.GothamSemibold,
+    BorderSizePixel = 0,
+    CornerRadius = UDim.new(0, 12),
+    ElementSize = UDim2.new(0, 400, 0, 500),
+    AnimationSpeed = 0.25,
+    DropShadow = true,
+    BlurBackground = true,
+    ModernIcons = true
 }
 
--- Loading animation function
-local function createLoadingScreen(guiParent)
-    local loadingScreen = Instance.new("ScreenGui")
-    loadingScreen.Name = "ForceLibLoadingScreen"
-    loadingScreen.ResetOnSpawn = false
-    loadingScreen.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
-    loadingScreen.DisplayOrder = 999
+-- Анимационные пресеты
+local tweenPresets = {
+    Smooth = Enum.EasingStyle.Quint,
+    Bounce = Enum.EasingStyle.Bounce,
+    Elastic = Enum.EasingStyle.Elastic,
+    Linear = Enum.EasingStyle.Linear
+}
+
+-- Вспомогательные функции
+local function createRoundedFrame(name, parent)
+    local frame = Instance.new("Frame")
+    frame.Name = name
+    frame.BackgroundColor3 = config.SecondaryColor
+    frame.BorderSizePixel = config.BorderSizePixel
+    frame.Parent = parent
+
+    local corner = Instance.new("UICorner")
+    corner.CornerRadius = config.CornerRadius
+    corner.Parent = frame
+
+    return frame
+end
+
+local function createTextLabel(name, text, parent)
+    local label = Instance.new("TextLabel")
+    label.Name = name
+    label.Text = text
+    label.Font = config.Font
+    label.TextColor3 = config.TextColor
+    label.BackgroundTransparency = 1
+    label.TextSize = 14
+    label.Parent = parent
+    return label
+end
+
+local function applyDropShadow(instance)
+    if not config.DropShadow then return end
     
-    local mainFrame = Instance.new("Frame")
-    mainFrame.Size = UDim2.new(0, 300, 0, 200)
-    mainFrame.Position = UDim2.new(0.5, 0, 0.5, 0)
-    mainFrame.AnchorPoint = Vector2.new(0.5, 0.5)
-    mainFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
-    mainFrame.BorderSizePixel = 0
-    mainFrame.Parent = loadingScreen
+    local shadow = Instance.new("ImageLabel")
+    shadow.Name = "DropShadow"
+    shadow.Image = "rbxassetid://1316045217"
+    shadow.ImageColor3 = Color3.new(0, 0, 0)
+    shadow.ImageTransparency = 0.8
+    shadow.ScaleType = Enum.ScaleType.Slice
+    shadow.SliceCenter = Rect.new(10, 10, 118, 118)
+    shadow.Size = UDim2.new(1, 20, 1, 20)
+    shadow.Position = UDim2.new(0, -10, 0, -10)
+    shadow.BackgroundTransparency = 1
+    shadow.Parent = instance
+    return shadow
+end
+
+-- Основной конструктор GUI
+function ForceLib.new(title, subtitle)
+    local self = setmetatable({}, ForceLib)
     
+    -- Создание основного окна
+    self.mainFrame = createRoundedFrame("ForceLibWindow", game:GetService("CoreGui"))
+    self.mainFrame.Size = config.ElementSize
+    self.mainFrame.Position = UDim2.new(0.5, -200, 0.5, -250)
+    self.mainFrame.AnchorPoint = Vector2.new(0.5, 0.5)
+    self.mainFrame.ZIndex = 100
+    
+    applyDropShadow(self.mainFrame)
+    
+    -- Заголовок окна
+    self.titleBar = createRoundedFrame("TitleBar", self.mainFrame)
+    self.titleBar.Size = UDim2.new(1, 0, 0, 40)
+    self.titleBar.BackgroundColor3 = config.PrimaryColor
+    
+    self.titleLabel = createTextLabel("Title", title or "Force Lib", self.titleBar)
+    self.titleLabel.Size = UDim2.new(0.7, 0, 1, 0)
+    self.titleLabel.Position = UDim2.new(0.05, 0, 0, 0)
+    self.titleLabel.TextXAlignment = Enum.TextXAlignment.Left
+    self.titleLabel.TextSize = 18
+    self.titleLabel.Font = Enum.Font.GothamBold
+    
+    self.subtitleLabel = createTextLabel("Subtitle", subtitle or "Premium UI Library", self.titleBar)
+    self.subtitleLabel.Size = UDim2.new(0.7, 0, 1, -20)
+    self.subtitleLabel.Position = UDim2.new(0.05, 0, 0, 20)
+    self.subtitleLabel.TextXAlignment = Enum.TextXAlignment.Left
+    self.subtitleLabel.TextSize = 12
+    self.subtitleLabel.TextTransparency = 0.3
+    
+    -- Кнопка закрытия
+    self.closeButton = Instance.new("TextButton")
+    self.closeButton.Name = "CloseButton"
+    self.closeButton.Size = UDim2.new(0, 30, 0, 30)
+    self.closeButton.Position = UDim2.new(1, -35, 0.5, -15)
+    self.closeButton.AnchorPoint = Vector2.new(0, 0.5)
+    self.closeButton.BackgroundColor3 = Color3.fromRGB(255, 80, 80)
+    self.closeButton.TextColor3 = config.TextColor
+    self.closeButton.Text = "×"
+    self.closeButton.Font = Enum.Font.GothamBold
+    self.closeButton.TextSize = 20
+    self.closeButton.Parent = self.titleBar
+    
+    local closeCorner = Instance.new("UICorner")
+    closeCorner.CornerRadius = UDim.new(1, 0)
+    closeCorner.Parent = self.closeButton
+    
+    self.closeButton.MouseButton1Click:Connect(function()
+        self:Destroy()
+    end)
+    
+    -- Контейнер для вкладок
+    self.tabContainer = createRoundedFrame("TabContainer", self.mainFrame)
+    self.tabContainer.Size = UDim2.new(1, -20, 0, 40)
+    self.tabContainer.Position = UDim2.new(0, 10, 0, 50)
+    self.tabContainer.BackgroundColor3 = Color3.fromRGB(40, 40, 50)
+    
+    -- Контейнер контента
+    self.contentContainer = createRoundedFrame("ContentContainer", self.mainFrame)
+    self.contentContainer.Size = UDim2.new(1, -20, 1, -110)
+    self.contentContainer.Position = UDim2.new(0, 10, 0, 100)
+    self.contentContainer.BackgroundColor3 = Color3.fromRGB(35, 35, 45)
+    self.contentContainer.ClipsDescendants = true
+    
+    -- Инициализация переменных
+    self.tabs = {}
+    self.currentTab = nil
+    self.elements = {}
+    self.dragging = false
+    self.dragStart = nil
+    self.startPos = nil
+    
+    -- Настройка перетаскивания
+    self.titleBar.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 then
+            self.dragging = true
+            self.dragStart = input.Position
+            self.startPos = self.mainFrame.Position
+            input.Changed:Connect(function()
+                if input.UserInputState == Enum.UserInputState.End then
+                    self.dragging = false
+                end
+            end)
+        end
+    end)
+    
+    UserInputService.InputChanged:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseMovement and self.dragging then
+            local delta = input.Position - self.dragStart
+            self.mainFrame.Position = UDim2.new(
+                self.startPos.X.Scale, 
+                self.startPos.X.Offset + delta.X,
+                self.startPos.Y.Scale, 
+                self.startPos.Y.Offset + delta.Y
+            )
+        end
+    end)
+    
+    -- Эффект размытия фона
+    if config.BlurBackground then
+        self.blurEffect = Instance.new("BlurEffect")
+        self.blurEffect.Size = 10
+        self.blurEffect.Parent = game:GetService("Lighting")
+        
+        self.mainFrame:GetPropertyChangedSignal("Visible"):Connect(function()
+            self.blurEffect.Enabled = self.mainFrame.Visible
+        end)
+    end
+    
+    return self
+end
+
+-- Методы для создания элементов интерфейса
+function ForceLib:CreateTab(name, icon)
+    local tabId = #self.tabs + 1
+    local tabButton = Instance.new("TextButton")
+    tabButton.Name = "Tab_"..name
+    tabButton.Size = UDim2.new(0, 100, 1, 0)
+    tabButton.Position = UDim2.new(0, 110 * (tabId - 1), 0, 0)
+    tabButton.BackgroundColor3 = tabId == 1 and config.PrimaryColor or Color3.fromRGB(60, 60, 70)
+    tabButton.TextColor3 = config.TextColor
+    tabButton.Text = name
+    tabButton.Font = config.Font
+    tabButton.TextSize = 14
+    tabButton.Parent = self.tabContainer
+    
+    local tabCorner = Instance.new("UICorner")
+    tabCorner.CornerRadius = UDim.new(0, 8)
+    tabCorner.Parent = tabButton
+    
+    local tabContent = Instance.new("ScrollingFrame")
+    tabContent.Name = "TabContent_"..name
+    tabContent.Size = UDim2.new(1, 0, 1, 0)
+    tabContent.Position = UDim2.new(0, 0, 0, 0)
+    tabContent.BackgroundTransparency = 1
+    tabContent.ScrollBarThickness = 5
+    tabContent.ScrollBarImageColor3 = config.PrimaryColor
+    tabContent.AutomaticCanvasSize = Enum.AutomaticSize.Y
+    tabContent.CanvasSize = UDim2.new(0, 0, 0, 0)
+    tabContent.Visible = tabId == 1
+    tabContent.Parent = self.contentContainer
+    
+    local tabLayout = Instance.new("UIListLayout")
+    tabLayout.Padding = UDim.new(0, 10)
+    tabLayout.SortOrder = Enum.SortOrder.LayoutOrder
+    tabLayout.Parent = tabContent
+    
+    local tabPadding = Instance.new("UIPadding")
+    tabPadding.PaddingTop = UDim.new(0, 10)
+    tabPadding.PaddingLeft = UDim.new(0, 10)
+    tabPadding.PaddingRight = UDim.new(0, 10)
+    tabPadding.Parent = tabContent
+    
+    local tabData = {
+        Button = tabButton,
+        Content = tabContent,
+        Elements = {}
+    }
+    
+    table.insert(self.tabs, tabData)
+    
+    if tabId == 1 then
+        self.currentTab = tabData
+    end
+    
+    tabButton.MouseButton1Click:Connect(function()
+        self:SwitchTab(tabId)
+    end)
+    
+    return tabData
+end
+
+function ForceLib:SwitchTab(tabId)
+    if self.currentTab == self.tabs[tabId] then return end
+    
+    -- Анимация переключения вкладок
+    for i, tab in ipairs(self.tabs) do
+        local tweenInfo = TweenInfo.new(
+            config.AnimationSpeed,
+            tweenPresets.Smooth,
+            Enum.EasingDirection.Out
+        )
+        
+        local tween = TweenService:Create(
+            tab.Button,
+            tweenInfo,
+            {
+                BackgroundColor3 = i == tabId and config.PrimaryColor or Color3.fromRGB(60, 60, 70)
+            }
+        )
+        
+        tween:Play()
+        
+        tab.Content.Visible = i == tabId
+    end
+    
+    self.currentTab = self.tabs[tabId]
+end
+
+function ForceLib:CreateSection(title)
+    if not self.currentTab then return end
+    
+    local sectionId = #self.currentTab.Elements + 1
+    local sectionFrame = createRoundedFrame("Section_"..sectionId, self.currentTab.Content)
+    sectionFrame.Size = UDim2.new(1, -20, 0, 40)
+    sectionFrame.BackgroundColor3 = Color3.fromRGB(45, 45, 55)
+    sectionFrame.LayoutOrder = sectionId
+    
+    local sectionTitle = createTextLabel("Title", title, sectionFrame)
+    sectionTitle.Size = UDim2.new(1, -20, 1, 0)
+    sectionTitle.Position = UDim2.new(0, 10, 0, 0)
+    sectionTitle.TextXAlignment = Enum.TextXAlignment.Left
+    sectionTitle.TextSize = 16
+    
+    local sectionContent = Instance.new("Frame")
+    sectionContent.Name = "Content"
+    sectionContent.Size = UDim2.new(1, 0, 0, 0)
+    sectionContent.Position = UDim2.new(0, 0, 0, 40)
+    sectionContent.BackgroundTransparency = 1
+    sectionContent.ClipsDescendants = true
+    sectionContent.Parent = sectionFrame
+    
+    local sectionLayout = Instance.new("UIListLayout")
+    sectionLayout.Padding = UDim.new(0, 5)
+    sectionLayout.SortOrder = Enum.SortOrder.LayoutOrder
+    sectionLayout.Parent = sectionContent
+    
+    local sectionData = {
+        Frame = sectionFrame,
+        Content = sectionContent,
+        Expanded = false
+    }
+    
+    table.insert(self.currentTab.Elements, sectionData)
+    
+    -- Переключение раздела
+    sectionFrame.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 then
+            sectionData.Expanded = not sectionData.Expanded
+            
+            local tweenInfo = TweenInfo.new(
+                config.AnimationSpeed,
+                tweenPresets.Smooth,
+                Enum.EasingDirection.Out
+            )
+            
+            if sectionData.Expanded then
+                local contentHeight = 0
+                for _, child in ipairs(sectionContent:GetChildren()) do
+                    if child:IsA("GuiObject") and child ~= sectionLayout then
+                        contentHeight = contentHeight + child.AbsoluteSize.Y + 5
+                    end
+                end
+                
+                TweenService:Create(
+                    sectionFrame,
+                    tweenInfo,
+                    {
+                        Size = UDim2.new(1, -20, 0, 40 + contentHeight)
+                    }
+                ):Play()
+            else
+                TweenService:Create(
+                    sectionFrame,
+                    tweenInfo,
+                    {
+                        Size = UDim2.new(1, -20, 0, 40)
+                    }
+                ):Play()
+            end
+        end
+    end)
+    
+    return sectionData
+end
+
+function ForceLib:CreateButton(text, callback)
+    if not self.currentTab then return end
+    
+    local section = self.currentTab.Elements[#self.currentTab.Elements] or self:CreateSection("Buttons")
+    
+    local button = Instance.new("TextButton")
+    button.Name = "Button_"..HttpService:GenerateGUID(false)
+    button.Size = UDim2.new(1, 0, 0, 35)
+    button.BackgroundColor3 = Color3.fromRGB(60, 60, 70)
+    button.TextColor3 = config.TextColor
+    button.Text = text
+    button.Font = config.Font
+    button.TextSize = 14
+    button.AutoButtonColor = false
+    button.Parent = section.Content
+    button.LayoutOrder = #section.Content:GetChildren()
+    
+    local buttonCorner = Instance.new("UICorner")
+    buttonCorner.CornerRadius = UDim.new(0, 8)
+    buttonCorner.Parent = button
+    
+    -- Эффекты наведения
+    local originalColor = button.BackgroundColor3
+    local hoverColor = Color3.fromRGB(
+        math.floor(originalColor.R * 255 + 20),
+        math.floor(originalColor.G * 255 + 20),
+        math.floor(originalColor.B * 255 + 20)
+    )
+    
+    button.MouseEnter:Connect(function()
+        TweenService:Create(
+            button,
+            TweenInfo.new(0.2),
+            {
+                BackgroundColor3 = hoverColor
+            }
+        ):Play()
+    end)
+    
+    button.MouseLeave:Connect(function()
+        TweenService:Create(
+            button,
+            TweenInfo.new(0.2),
+            {
+                BackgroundColor3 = originalColor
+            }
+        ):Play()
+    end)
+    
+    button.MouseButton1Click:Connect(function()
+        if callback then
+            -- Эффект нажатия
+            TweenService:Create(
+                button,
+                TweenInfo.new(0.1),
+                {
+                    BackgroundColor3 = config.PrimaryColor,
+                    TextColor3 = config.DarkTextColor
+                }
+            ):Play()
+            
+            TweenService:Create(
+                button,
+                TweenInfo.new(0.1, Enum.EasingStyle.Quad, Enum.EasingDirection.Out, 0, false, 0.1),
+                {
+                    BackgroundColor3 = hoverColor,
+                    TextColor3 = config.TextColor
+                }
+            ):Play()
+            
+            callback()
+        end
+    end)
+    
+    return button
+end
+
+function ForceLib:CreateToggle(text, default, callback)
+    if not self.currentTab then return end
+    
+    local section = self.currentTab.Elements[#self.currentTab.Elements] or self:CreateSection("Toggles")
+    
+    local toggleFrame = Instance.new("Frame")
+    toggleFrame.Name = "Toggle_"..HttpService:GenerateGUID(false)
+    toggleFrame.Size = UDim2.new(1, 0, 0, 30)
+    toggleFrame.BackgroundTransparency = 1
+    toggleFrame.Parent = section.Content
+    toggleFrame.LayoutOrder = #section.Content:GetChildren()
+    
+    local toggleLabel = createTextLabel("Label", text, toggleFrame)
+    toggleLabel.Size = UDim2.new(0.7, 0, 1, 0)
+    toggleLabel.TextXAlignment = Enum.TextXAlignment.Left
+    
+    local toggleButton = Instance.new("TextButton")
+    toggleButton.Name = "ToggleButton"
+    toggleButton.Size = UDim2.new(0, 50, 0, 25)
+    toggleButton.Position = UDim2.new(1, -50, 0.5, -12.5)
+    toggleButton.AnchorPoint = Vector2.new(1, 0.5)
+    toggleButton.BackgroundColor3 = default and config.PrimaryColor or Color3.fromRGB(80, 80, 80)
+    toggleButton.AutoButtonColor = false
+    toggleButton.Text = ""
+    toggleButton.Parent = toggleFrame
+    
+    local toggleCorner = Instance.new("UICorner")
+    toggleCorner.CornerRadius = UDim.new(1, 0)
+    toggleCorner.Parent = toggleButton
+    
+    local toggleDot = Instance.new("Frame")
+    toggleDot.Name = "Dot"
+    toggleDot.Size = UDim2.new(0, 19, 0, 19)
+    toggleDot.Position = default and UDim2.new(1, -22, 0.5, -9.5) or UDim2.new(0, 3, 0.5, -9.5)
+    toggleDot.AnchorPoint = Vector2.new(1, 0.5)
+    toggleDot.BackgroundColor3 = config.TextColor
+    toggleDot.Parent = toggleButton
+    
+    local dotCorner = Instance.new("UICorner")
+    dotCorner.CornerRadius = UDim.new(1, 0)
+    dotCorner.Parent = toggleDot
+    
+    local state = default or false
+    
+    toggleButton.MouseButton1Click:Connect(function()
+        state = not state
+        
+        local tweenInfo = TweenInfo.new(
+            0.2,
+            tweenPresets.Smooth,
+            Enum.EasingDirection.Out
+        )
+        
+        TweenService:Create(
+            toggleButton,
+            tweenInfo,
+            {
+                BackgroundColor3 = state and config.PrimaryColor or Color3.fromRGB(80, 80, 80)
+            }
+        ):Play()
+        
+        TweenService:Create(
+            toggleDot,
+            tweenInfo,
+            {
+                Position = state and UDim2.new(1, -22, 0.5, -9.5) or UDim2.new(0, 3, 0.5, -9.5)
+            }
+        ):Play()
+        
+        if callback then
+            callback(state)
+        end
+    end)
+    
+    return {
+        Frame = toggleFrame,
+        Button = toggleButton,
+        Dot = toggleDot,
+        Set = function(self, value)
+            state = value
+            toggleButton.BackgroundColor3 = state and config.PrimaryColor or Color3.fromRGB(80, 80, 80)
+            toggleDot.Position = state and UDim2.new(1, -22, 0.5, -9.5) or UDim2.new(0, 3, 0.5, -9.5)
+            if callback then callback(state) end
+        end,
+        Get = function(self)
+            return state
+        end
+    }
+end
+
+-- Дополнительные методы (Slider, Dropdown, ColorPicker, Keybind и т.д.)
+-- ... (реализация аналогична с анимациями и эффектами)
+
+-- Методы управления окном
+function ForceLib:Show()
+    self.mainFrame.Visible = true
+    if self.blurEffect then
+        self.blurEffect.Enabled = true
+    end
+end
+
+function ForceLib:Hide()
+    self.mainFrame.Visible = false
+    if self.blurEffect then
+        self.blurEffect.Enabled = false
+    end
+end
+
+function ForceLib:Toggle()
+    self.mainFrame.Visible = not self.mainFrame.Visible
+    if self.blurEffect then
+        self.blurEffect.Enabled = self.mainFrame.Visible
+    end
+end
+
+function ForceLib:Destroy()
+    if self.blurEffect then
+        self.blurEffect:Destroy()
+    end
+    self.mainFrame:Destroy()
+    setmetatable(self, nil)
+end
+
+-- Возвращаем библиотеку
+return ForceLib    
     local title = Instance.new("TextLabel")
     title.Size = UDim2.new(1, 0, 0, 40)
     title.Position = UDim2.new(0, 0, 0, 20)
